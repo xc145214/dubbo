@@ -34,12 +34,12 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class RpcStatus {
     /**
-     * 存储服务统计。
+     * 存储服务统计结果。
      */
     private static final ConcurrentMap<String, RpcStatus> SERVICE_STATISTICS = new ConcurrentHashMap<String, RpcStatus>();
 
     /**
-     * 存储方法统计。
+     * 存储方法统计结果。
      */
     private static final ConcurrentMap<String, ConcurrentMap<String, RpcStatus>> METHOD_STATISTICS = new ConcurrentHashMap<String, ConcurrentMap<String, RpcStatus>>();
     private final ConcurrentMap<String, Object> values = new ConcurrentHashMap<String, Object>();
