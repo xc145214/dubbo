@@ -328,6 +328,7 @@ public class RpcStatus {
 
     /**
      * Get the semaphore for thread number. Semaphore's permits is decided by {@link Constants#EXECUTES_KEY}
+     * 并发限制。
      *
      * @param maxThreadNum value of {@link Constants#EXECUTES_KEY}
      * @return thread number semaphore
