@@ -28,6 +28,13 @@ public class DefaultTPSLimiter implements TPSLimiter {
     private final ConcurrentMap<String, StatItem> stats
             = new ConcurrentHashMap<String, StatItem>();
 
+    /**
+     * 默认限流措施：
+     *
+     * @param url        url
+     * @param invocation invocation
+     * @return
+     */
     @Override
     public boolean isAllowable(URL url, Invocation invocation) {
         int rate = url.getParameter(Constants.TPS_LIMIT_RATE_KEY, -1);

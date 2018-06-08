@@ -24,10 +24,16 @@ class StatItem {
 
     private long lastResetTime;
 
+    /**
+     * 时间间隔。
+     */
     private long interval;
 
     private AtomicInteger token;
 
+    /**
+     * 调用次数。
+     */
     private int rate;
 
     StatItem(String name, int rate, long interval) {
@@ -38,6 +44,12 @@ class StatItem {
         this.token = new AtomicInteger(rate);
     }
 
+    /**
+     * 服务限流。
+     *  指定时间调用 rate 次数后不允许调用。
+     *
+     * @return
+     */
     public boolean isAllowable() {
         long now = System.currentTimeMillis();
         if (now > lastResetTime + interval) {
