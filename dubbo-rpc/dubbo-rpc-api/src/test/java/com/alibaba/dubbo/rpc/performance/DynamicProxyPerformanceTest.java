@@ -35,7 +35,7 @@ public class DynamicProxyPerformanceTest {
 
 
     @Test
-    public void proformance() throws Exception {
+    public void performance() throws Exception {
         CountService delegate = new CountServiceImpl();
 
         long time = System.currentTimeMillis();
