@@ -31,6 +31,9 @@ public class RpcResult implements Result, Serializable {
 
     private Object result;
 
+    /**
+     * 异常封装。
+     */
     private Throwable exception;
 
     private Map<String, String> attachments = new HashMap<String, String>();

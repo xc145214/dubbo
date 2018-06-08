@@ -57,12 +57,15 @@ public class RpcStatus {
     }
 
     /**
+     * 根据URL 查询服务状态。
+     *
      * @param url
      * @return status
      */
     public static RpcStatus getStatus(URL url) {
         String uri = url.toIdentityString();
         RpcStatus status = SERVICE_STATISTICS.get(uri);
+        //如果不存在，访入缓存。
         if (status == null) {
             SERVICE_STATISTICS.putIfAbsent(uri, new RpcStatus());
             status = SERVICE_STATISTICS.get(uri);
@@ -71,6 +74,8 @@ public class RpcStatus {
     }
 
     /**
+     * 删除URL的服务统计。
+     *
      * @param url
      */
     public static void removeStatus(URL url) {
@@ -79,6 +84,8 @@ public class RpcStatus {
     }
 
     /**
+     * 根据URL和 methodName 查询服务的状态。
+     *
      * @param url
      * @param methodName
      * @return status
@@ -87,11 +94,13 @@ public class RpcStatus {
         String uri = url.toIdentityString();
         ConcurrentMap<String, RpcStatus> map = METHOD_STATISTICS.get(uri);
         if (map == null) {
+            //如果不存在，访入缓存。
             METHOD_STATISTICS.putIfAbsent(uri, new ConcurrentHashMap<String, RpcStatus>());
             map = METHOD_STATISTICS.get(uri);
         }
         RpcStatus status = map.get(methodName);
         if (status == null) {
+            //如果不存在，访入缓存。
             map.putIfAbsent(methodName, new RpcStatus());
             status = map.get(methodName);
         }
