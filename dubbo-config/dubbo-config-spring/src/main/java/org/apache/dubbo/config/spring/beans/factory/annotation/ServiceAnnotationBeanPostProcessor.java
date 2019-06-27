@@ -18,9 +18,11 @@ package org.apache.dubbo.config.spring.beans.factory.annotation;
 
 import org.apache.dubbo.common.logger.Logger;
 import org.apache.dubbo.common.logger.LoggerFactory;
+import org.apache.dubbo.common.utils.ArrayUtils;
 import org.apache.dubbo.config.annotation.Service;
 import org.apache.dubbo.config.spring.ServiceBean;
 import org.apache.dubbo.config.spring.context.annotation.DubboClassPathBeanDefinitionScanner;
+
 import org.springframework.beans.BeansException;
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.factory.BeanClassLoaderAware;
@@ -52,14 +54,17 @@ import org.springframework.util.StringUtils;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
+import static org.apache.dubbo.config.spring.beans.factory.annotation.ServiceBeanNameBuilder.create;
 import static org.apache.dubbo.config.spring.util.ObjectUtils.of;
 import static org.springframework.beans.factory.support.BeanDefinitionBuilder.rootBeanDefinition;
 import static org.springframework.context.annotation.AnnotationConfigUtils.CONFIGURATION_BEAN_NAME_GENERATOR;
-import static org.springframework.core.annotation.AnnotationUtils.findAnnotation;
+import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 import static org.springframework.util.ClassUtils.resolveClassName;
 
 /**
@@ -71,7 +76,6 @@ import static org.springframework.util.ClassUtils.resolveClassName;
 public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistryPostProcessor, EnvironmentAware,
         ResourceLoaderAware, BeanClassLoaderAware {
 
-    private static final String SEPARATOR = ":";
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -88,7 +92,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
     }
 
     public ServiceAnnotationBeanPostProcessor(Collection<String> packagesToScan) {
-        this(new LinkedHashSet<String>(packagesToScan));
+        this(new LinkedHashSet<>(packagesToScan));
     }
 
     public ServiceAnnotationBeanPostProcessor(Set<String> packagesToScan) {
@@ -218,7 +222,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
         Set<BeanDefinition> beanDefinitions = scanner.findCandidateComponents(packageToScan);
 
-        Set<BeanDefinitionHolder> beanDefinitionHolders = new LinkedHashSet<BeanDefinitionHolder>(beanDefinitions.size());
+        Set<BeanDefinitionHolder> beanDefinitionHolders = new LinkedHashSet<>(beanDefinitions.size());
 
         for (BeanDefinition beanDefinition : beanDefinitions) {
 
@@ -246,7 +250,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
         Class<?> beanClass = resolveClass(beanDefinitionHolder);
 
-        Service service = findAnnotation(beanClass, Service.class);
+        Service service = findMergedAnnotation(beanClass, Service.class);
 
         Class<?> interfaceClass = resolveServiceInterfaceClass(beanClass, service);
 
@@ -256,13 +260,13 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
                 buildServiceBeanDefinition(service, interfaceClass, annotatedServiceBeanName);
 
         // ServiceBean Bean name
-        String beanName = generateServiceBeanName(service, interfaceClass, annotatedServiceBeanName);
+        String beanName = generateServiceBeanName(service, interfaceClass);
 
         if (scanner.checkCandidate(beanName, serviceBeanDefinition)) { // check duplicated candidate bean
             registry.registerBeanDefinition(beanName, serviceBeanDefinition);
 
             if (logger.isInfoEnabled()) {
-                logger.warn("The BeanDefinition[" + serviceBeanDefinition +
+                logger.info("The BeanDefinition[" + serviceBeanDefinition +
                         "] of ServiceBean has been registered with name : " + beanName);
             }
 
@@ -282,35 +286,14 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
      * Generates the bean name of {@link ServiceBean}
      *
      * @param service
-     * @param interfaceClass           the class of interface annotated {@link Service}
-     * @param annotatedServiceBeanName the bean name of annotated {@link Service}
+     * @param interfaceClass the class of interface annotated {@link Service}
      * @return ServiceBean@interfaceClassName#annotatedServiceBeanName
      * @since 2.5.9
      */
-    private String generateServiceBeanName(Service service, Class<?> interfaceClass, String annotatedServiceBeanName) {
+    private String generateServiceBeanName(Service service, Class<?> interfaceClass) {
+        ServiceBeanNameBuilder builder = create(service, interfaceClass, environment);
 
-        StringBuilder beanNameBuilder = new StringBuilder(ServiceBean.class.getSimpleName());
-
-        beanNameBuilder.append(SEPARATOR).append(annotatedServiceBeanName);
-
-        String interfaceClassName = interfaceClass.getName();
-
-        beanNameBuilder.append(SEPARATOR).append(interfaceClassName);
-
-        String version = service.version();
-
-        if (StringUtils.hasText(version)) {
-            beanNameBuilder.append(SEPARATOR).append(version);
-        }
-
-        String group = service.group();
-
-        if (StringUtils.hasText(group)) {
-            beanNameBuilder.append(SEPARATOR).append(group);
-        }
-
-        return beanNameBuilder.toString();
-
+        return builder.build();
     }
 
     private Class<?> resolveServiceInterfaceClass(Class<?> annotatedServiceBeanClass, Service service) {
@@ -332,8 +315,9 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
         }
 
         if (interfaceClass == null) {
-
-            Class<?>[] allInterfaces = annotatedServiceBeanClass.getInterfaces();
+            // Find all interfaces from the annotated class
+            // To resolve an issue : https://github.com/apache/dubbo/issues/3251
+            Class<?>[] allInterfaces = ClassUtils.getAllInterfacesForClass(annotatedServiceBeanClass);
 
             if (allInterfaces.length > 0) {
                 interfaceClass = allInterfaces[0];
@@ -386,7 +370,8 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
         MutablePropertyValues propertyValues = beanDefinition.getPropertyValues();
 
-        String[] ignoreAttributeNames = of("provider", "monitor", "application", "module", "registry", "protocol", "interface");
+        String[] ignoreAttributeNames = of("provider", "monitor", "application", "module", "registry", "protocol",
+                "interface", "interfaceName", "parameters");
 
         propertyValues.addPropertyValues(new AnnotationPropertyValuesAdapter(service, environment, ignoreAttributeNames));
 
@@ -394,6 +379,8 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
         addPropertyReference(builder, "ref", annotatedServiceBeanName);
         // Set interface
         builder.addPropertyValue("interface", interfaceClass.getName());
+        // Convert parameters into map
+        builder.addPropertyValue("parameters", convertParameters(service.parameters()));
 
         /**
          * Add {@link org.apache.dubbo.config.ProviderConfig} Bean reference
@@ -457,7 +444,7 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
 
     private ManagedList<RuntimeBeanReference> toRuntimeBeanReferences(String... beanNames) {
 
-        ManagedList<RuntimeBeanReference> runtimeBeanReferences = new ManagedList<RuntimeBeanReference>();
+        ManagedList<RuntimeBeanReference> runtimeBeanReferences = new ManagedList<>();
 
         if (!ObjectUtils.isEmpty(beanNames)) {
 
@@ -479,6 +466,22 @@ public class ServiceAnnotationBeanPostProcessor implements BeanDefinitionRegistr
         builder.addPropertyReference(propertyName, resolvedBeanName);
     }
 
+
+    private Map<String, String> convertParameters(String[] parameters) {
+        if (ArrayUtils.isEmpty(parameters)) {
+            return null;
+        }
+
+        if (parameters.length % 2 != 0) {
+            throw new IllegalArgumentException("parameter attribute must be paired with key followed by value");
+        }
+
+        Map<String, String> map = new HashMap<>();
+        for (int i = 0; i < parameters.length; i += 2) {
+            map.put(parameters[i], parameters[i + 1]);
+        }
+        return map;
+    }
 
     @Override
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
