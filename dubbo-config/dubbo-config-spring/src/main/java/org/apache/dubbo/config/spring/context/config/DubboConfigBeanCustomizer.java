@@ -17,7 +17,6 @@
 package org.apache.dubbo.config.spring.context.config;
 
 import org.apache.dubbo.config.AbstractConfig;
-import org.apache.dubbo.config.spring.beans.factory.annotation.DubboConfigBindingBeanPostProcessor;
 import org.apache.dubbo.config.spring.context.properties.DubboConfigBinder;
 
 import org.springframework.context.ApplicationContext;
@@ -32,10 +31,9 @@ import org.springframework.core.Ordered;
  * are executed orderly, thus the subclass should be aware to implement the {@link #getOrder()} method.
  *
  * @see DubboConfigBinder#bind(String, AbstractConfig)
- * @see DubboConfigBindingBeanPostProcessor
  * @since 2.6.6
  */
-public interface DubboConfigBeanCustomizer extends Ordered {
+public interface DubboConfigBeanCustomizer extends ConfigurationBeanCustomizer, Ordered {
 
     /**
      * Customize {@link AbstractConfig Dubbo Config Bean}
@@ -44,4 +42,11 @@ public interface DubboConfigBeanCustomizer extends Ordered {
      * @param dubboConfigBean the instance of {@link AbstractConfig Dubbo Config Bean}
      */
     void customize(String beanName, AbstractConfig dubboConfigBean);
+
+    @Override
+    default void customize(String beanName, Object configurationBean) {
+        if (configurationBean instanceof AbstractConfig) {
+            customize(beanName, (AbstractConfig) configurationBean);
+        }
+    }
 }

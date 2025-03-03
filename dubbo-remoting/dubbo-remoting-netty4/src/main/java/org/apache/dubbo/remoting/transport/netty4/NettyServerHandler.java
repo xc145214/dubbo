@@ -22,15 +22,19 @@ import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.utils.NetUtils;
 import org.apache.dubbo.remoting.Channel;
 import org.apache.dubbo.remoting.ChannelHandler;
+import org.apache.dubbo.remoting.Constants;
+
+import javax.net.ssl.SSLSession;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
+import io.netty.handler.ssl.SslHandshakeCompletionEvent;
 import io.netty.handler.timeout.IdleStateEvent;
-
-import java.net.InetSocketAddress;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import io.netty.util.AttributeKey;
 
 /**
  * NettyServerHandler.
@@ -42,7 +46,9 @@ public class NettyServerHandler extends ChannelDuplexHandler {
      * the cache for alive worker channel.
      * <ip:port, dubbo channel>
      */
-    private final Map<String, Channel> channels = new ConcurrentHashMap<String, Channel>();
+    private final Map<String, Channel> channels = new ConcurrentHashMap<>();
+
+    private static final AttributeKey<SSLSession> SSL_SESSION_KEY = AttributeKey.valueOf(Constants.SSL_SESSION_KEY);
 
     private final URL url;
 
@@ -65,48 +71,55 @@ public class NettyServerHandler extends ChannelDuplexHandler {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
-        try {
-            if (channel != null) {
-                channels.put(NetUtils.toAddressString((InetSocketAddress) ctx.channel().remoteAddress()), channel);
-            }
-            handler.connected(channel);
-        } finally {
-            NettyChannel.removeChannelIfDisconnected(ctx.channel());
+        io.netty.channel.Channel ch = ctx.channel();
+        NettyChannel channel = NettyChannel.getOrAddChannel(ch, url, handler);
+        if (channel != null) {
+            channels.put(NetUtils.toAddressString(channel.getRemoteAddress()), channel);
+        }
+        handler.connected(channel);
+
+        if (logger.isInfoEnabled() && channel != null) {
+            logger.info(
+                    "The connection {} of {} -> {} is established.",
+                    ch,
+                    channel.getLocalAddressKey(),
+                    channel.getRemoteAddressKey());
         }
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
+        io.netty.channel.Channel ch = ctx.channel();
+        NettyChannel channel = NettyChannel.getOrAddChannel(ch, url, handler);
         try {
-            channels.remove(NetUtils.toAddressString((InetSocketAddress) ctx.channel().remoteAddress()));
+            channels.remove(NetUtils.toAddressString(channel.getRemoteAddress()));
             handler.disconnected(channel);
         } finally {
-            NettyChannel.removeChannelIfDisconnected(ctx.channel());
+            NettyChannel.removeChannel(ch);
+        }
+
+        if (logger.isInfoEnabled()) {
+            logger.info(
+                    "The connection {} of {} -> {} is disconnected.",
+                    ch,
+                    channel.getRemoteAddressKey(),
+                    channel.getLocalAddressKey());
         }
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
-        try {
-            handler.received(channel, msg);
-        } finally {
-            NettyChannel.removeChannelIfDisconnected(ctx.channel());
-        }
+        handler.received(channel, msg);
+        // trigger qos handler
+        ctx.fireChannelRead(msg);
     }
-
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
         super.write(ctx, msg, promise);
         NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
-        try {
-            handler.sent(channel, msg);
-        } finally {
-            NettyChannel.removeChannelIfDisconnected(ctx.channel());
-        }
+        handler.sent(channel, msg);
     }
 
     @Override
@@ -122,11 +135,19 @@ public class NettyServerHandler extends ChannelDuplexHandler {
             }
         }
         super.userEventTriggered(ctx, evt);
+        if (evt instanceof SslHandshakeCompletionEvent) {
+            SslHandshakeCompletionEvent handshakeEvent = (SslHandshakeCompletionEvent) evt;
+            if (handshakeEvent.isSuccess()) {
+                NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
+                channel.setAttribute(
+                        Constants.SSL_SESSION_KEY,
+                        ctx.channel().attr(SSL_SESSION_KEY).get());
+            }
+        }
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
-            throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         NettyChannel channel = NettyChannel.getOrAddChannel(ctx.channel(), url, handler);
         try {
             handler.caught(channel, cause);

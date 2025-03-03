@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.dubbo.remoting.buffer;
 
 import java.io.IOException;
@@ -275,7 +274,7 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
      * not an instance of {@link ChannelBuffer} type.
      */
     @Override
-    public boolean equals(Object o);
+    boolean equals(Object o);
 
     /**
      * Returns the factory which creates a {@link ChannelBuffer} whose type and
@@ -928,7 +927,7 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
     /**
      * Returns the backing byte array of this buffer.
      *
-     * @throws UnsupportedOperationException if there no accessible backing byte
+     * @throws UnsupportedOperationException if there is no accessible backing byte
      *                                       array
      */
     byte[] array();
@@ -944,8 +943,14 @@ public interface ChannelBuffer extends Comparable<ChannelBuffer> {
      * Returns the offset of the first byte within the backing byte array of
      * this buffer.
      *
-     * @throws UnsupportedOperationException if there no accessible backing byte
+     * @throws UnsupportedOperationException if there is no accessible backing byte
      *                                       array
      */
     int arrayOffset();
+
+    /**
+     * If this buffer is backed by an NIO direct buffer,
+     * in some scenarios it may be necessary to manually release.
+     */
+    default void release() {}
 }

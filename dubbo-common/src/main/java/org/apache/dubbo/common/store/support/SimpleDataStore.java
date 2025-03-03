@@ -14,10 +14,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.dubbo.common.store.support;
 
+import org.apache.dubbo.common.constants.LoggerCodeConstants;
+import org.apache.dubbo.common.logger.ErrorTypeAwareLogger;
+import org.apache.dubbo.common.logger.LoggerFactory;
 import org.apache.dubbo.common.store.DataStore;
+import org.apache.dubbo.common.store.DataStoreUpdateListener;
+import org.apache.dubbo.common.utils.ConcurrentHashMapUtils;
+import org.apache.dubbo.common.utils.ConcurrentHashSet;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,19 +30,20 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 public class SimpleDataStore implements DataStore {
+    private static final ErrorTypeAwareLogger logger = LoggerFactory.getErrorTypeAwareLogger(SimpleDataStore.class);
 
     // <component name or id, <data-name, data-value>>
-    private ConcurrentMap<String, ConcurrentMap<String, Object>> data =
-            new ConcurrentHashMap<String, ConcurrentMap<String, Object>>();
+    private final ConcurrentMap<String, ConcurrentMap<String, Object>> data = new ConcurrentHashMap<>();
+    private final ConcurrentHashSet<DataStoreUpdateListener> listeners = new ConcurrentHashSet<>();
 
     @Override
     public Map<String, Object> get(String componentName) {
         ConcurrentMap<String, Object> value = data.get(componentName);
         if (value == null) {
-            return new HashMap<String, Object>();
+            return new HashMap<>();
         }
 
-        return new HashMap<String, Object>(value);
+        return new HashMap<>(value);
     }
 
     @Override
@@ -50,12 +56,10 @@ public class SimpleDataStore implements DataStore {
 
     @Override
     public void put(String componentName, String key, Object value) {
-        Map<String, Object> componentData = data.get(componentName);
-        if (null == componentData) {
-            data.putIfAbsent(componentName, new ConcurrentHashMap<String, Object>());
-            componentData = data.get(componentName);
-        }
+        Map<String, Object> componentData =
+                ConcurrentHashMapUtils.computeIfAbsent(data, componentName, k -> new ConcurrentHashMap<>());
         componentData.put(key, value);
+        notifyListeners(componentName, key, value);
     }
 
     @Override
@@ -64,6 +68,27 @@ public class SimpleDataStore implements DataStore {
             return;
         }
         data.get(componentName).remove(key);
+        notifyListeners(componentName, key, null);
     }
 
+    @Override
+    public void addListener(DataStoreUpdateListener dataStoreUpdateListener) {
+        listeners.add(dataStoreUpdateListener);
+    }
+
+    private void notifyListeners(String componentName, String key, Object value) {
+        for (DataStoreUpdateListener listener : listeners) {
+            try {
+                listener.onUpdate(componentName, key, value);
+            } catch (Throwable t) {
+                logger.warn(
+                        LoggerCodeConstants.INTERNAL_ERROR,
+                        "",
+                        "",
+                        "Failed to notify data store update listener. " + "ComponentName: " + componentName + " Key: "
+                                + key,
+                        t);
+            }
+        }
+    }
 }

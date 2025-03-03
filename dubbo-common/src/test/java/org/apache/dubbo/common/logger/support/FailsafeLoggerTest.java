@@ -20,6 +20,7 @@ import org.apache.dubbo.common.logger.Logger;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -27,9 +28,9 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-public class FailsafeLoggerTest {
+class FailsafeLoggerTest {
     @Test
-    public void testFailSafeForLoggingMethod() {
+    void testFailSafeForLoggingMethod() {
         Logger failLogger = mock(Logger.class);
         FailsafeLogger failsafeLogger = new FailsafeLogger(failLogger);
 
@@ -65,8 +66,14 @@ public class FailsafeLoggerTest {
     }
 
     @Test
-    public void testSuccessLogger() {
+    void testSuccessLogger() {
         Logger successLogger = mock(Logger.class);
+        Mockito.when(successLogger.isErrorEnabled()).thenReturn(true);
+        Mockito.when(successLogger.isWarnEnabled()).thenReturn(true);
+        Mockito.when(successLogger.isInfoEnabled()).thenReturn(true);
+        Mockito.when(successLogger.isDebugEnabled()).thenReturn(true);
+        Mockito.when(successLogger.isTraceEnabled()).thenReturn(true);
+
         FailsafeLogger failsafeLogger = new FailsafeLogger(successLogger);
         failsafeLogger.error("error");
         failsafeLogger.warn("warn");
@@ -94,7 +101,7 @@ public class FailsafeLoggerTest {
     }
 
     @Test
-    public void testGetLogger() {
+    void testGetLogger() {
         Assertions.assertThrows(RuntimeException.class, () -> {
             Logger failLogger = mock(Logger.class);
             FailsafeLogger failsafeLogger = new FailsafeLogger(failLogger);

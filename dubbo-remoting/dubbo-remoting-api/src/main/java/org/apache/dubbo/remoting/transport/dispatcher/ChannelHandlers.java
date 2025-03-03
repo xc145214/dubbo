@@ -17,7 +17,6 @@
 package org.apache.dubbo.remoting.transport.dispatcher;
 
 import org.apache.dubbo.common.URL;
-import org.apache.dubbo.common.extension.ExtensionLoader;
 import org.apache.dubbo.remoting.ChannelHandler;
 import org.apache.dubbo.remoting.Dispatcher;
 import org.apache.dubbo.remoting.exchange.support.header.HeartbeatHandler;
@@ -27,14 +26,13 @@ public class ChannelHandlers {
 
     private static ChannelHandlers INSTANCE = new ChannelHandlers();
 
-    protected ChannelHandlers() {
-    }
+    protected ChannelHandlers() {}
 
     public static ChannelHandler wrap(ChannelHandler handler, URL url) {
         return ChannelHandlers.getInstance().wrapInternal(handler, url);
     }
 
-    protected static ChannelHandlers getInstance() {
+    public static ChannelHandlers getInstance() {
         return INSTANCE;
     }
 
@@ -43,7 +41,9 @@ public class ChannelHandlers {
     }
 
     protected ChannelHandler wrapInternal(ChannelHandler handler, URL url) {
-        return new MultiMessageHandler(new HeartbeatHandler(ExtensionLoader.getExtensionLoader(Dispatcher.class)
-                .getAdaptiveExtension().dispatch(handler, url)));
+        return new MultiMessageHandler(new HeartbeatHandler(url.getOrDefaultFrameworkModel()
+                .getExtensionLoader(Dispatcher.class)
+                .getAdaptiveExtension()
+                .dispatch(handler, url)));
     }
 }

@@ -14,8 +14,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package com.alibaba.dubbo.config.annotation;
+
+import org.apache.dubbo.config.annotation.DubboService;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -24,10 +25,16 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
+/**
+ * Service annotation
+ *
+ * @see DubboService
+ * @deprecated Recommend {@link DubboService} as the substitute
+ */
 @Deprecated
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE})
+@Target({ElementType.TYPE, ElementType.METHOD})
 @Inherited
 public @interface Service {
 
@@ -51,15 +58,15 @@ public @interface Service {
 
     String accesslog() default "";
 
-    int executes() default 0;
+    int executes() default -1;
 
     boolean register() default false;
 
-    int weight() default 0;
+    int weight() default -1;
 
     String document() default "";
 
-    int delay() default 0;
+    int delay() default -1;
 
     String local() default "";
 
@@ -69,9 +76,9 @@ public @interface Service {
 
     String proxy() default "";
 
-    int connections() default 0;
+    int connections() default -1;
 
-    int callbacks() default 0;
+    int callbacks() default -1;
 
     String onconnect() default "";
 
@@ -81,13 +88,13 @@ public @interface Service {
 
     String layer() default "";
 
-    int retries() default 0;
+    int retries() default -1;
 
     String loadbalance() default "";
 
     boolean async() default false;
 
-    int actives() default 0;
+    int actives() default -1;
 
     boolean sent() default false;
 
@@ -95,7 +102,7 @@ public @interface Service {
 
     String validation() default "";
 
-    int timeout() default 0;
+    int timeout() default -1;
 
     String cache() default "";
 
@@ -105,6 +112,11 @@ public @interface Service {
 
     String[] parameters() default {};
 
+    /**
+     * Application associated name
+     * @deprecated Do not set it and use the global Application Config
+     */
+    @Deprecated
     String application() default "";
 
     String module() default "";
@@ -116,5 +128,4 @@ public @interface Service {
     String monitor() default "";
 
     String[] registry() default {};
-
 }

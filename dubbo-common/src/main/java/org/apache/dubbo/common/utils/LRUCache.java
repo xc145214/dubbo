@@ -19,14 +19,21 @@ package org.apache.dubbo.common.utils;
 import java.util.LinkedHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 
+/**
+ * A 'least recently used' cache based on LinkedHashMap.
+ *
+ * @param <K> key
+ * @param <V> value
+ */
 public class LRUCache<K, V> extends LinkedHashMap<K, V> {
 
     private static final long serialVersionUID = -5167631809472116969L;
 
     private static final float DEFAULT_LOAD_FACTOR = 0.75f;
-
     private static final int DEFAULT_MAX_CAPACITY = 1000;
+
     private final Lock lock = new ReentrantLock();
     private volatile int maxCapacity;
 
@@ -104,6 +111,38 @@ public class LRUCache<K, V> extends LinkedHashMap<K, V> {
         }
     }
 
+    @Override
+    public V putIfAbsent(K key, V value) {
+        lock.lock();
+        try {
+            return super.putIfAbsent(key, value);
+        } finally {
+            lock.unlock();
+        }
+    }
+
+    @Override
+    public V computeIfAbsent(K key, Function<? super K, ? extends V> fn) {
+        V value = get(key);
+        if (value == null) {
+            lock.lock();
+            try {
+                return super.computeIfAbsent(key, fn);
+            } finally {
+                lock.unlock();
+            }
+        }
+        return value;
+    }
+
+    public void lock() {
+        lock.lock();
+    }
+
+    public void releaseLock() {
+        lock.unlock();
+    }
+
     public int getMaxCapacity() {
         return maxCapacity;
     }
@@ -111,5 +150,4 @@ public class LRUCache<K, V> extends LinkedHashMap<K, V> {
     public void setMaxCapacity(int maxCapacity) {
         this.maxCapacity = maxCapacity;
     }
-
 }

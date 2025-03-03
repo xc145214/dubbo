@@ -18,6 +18,7 @@ package org.apache.dubbo.remoting;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.Adaptive;
+import org.apache.dubbo.common.extension.ExtensionScope;
 import org.apache.dubbo.common.extension.SPI;
 
 /**
@@ -28,7 +29,7 @@ import org.apache.dubbo.common.extension.SPI;
  *
  * @see org.apache.dubbo.remoting.Transporters
  */
-@SPI("netty")
+@SPI(value = "netty", scope = ExtensionScope.FRAMEWORK)
 public interface Transporter {
 
     /**
@@ -41,7 +42,7 @@ public interface Transporter {
      * @see org.apache.dubbo.remoting.Transporters#bind(URL, ChannelHandler...)
      */
     @Adaptive({Constants.SERVER_KEY, Constants.TRANSPORTER_KEY})
-    Server bind(URL url, ChannelHandler handler) throws RemotingException;
+    RemotingServer bind(URL url, ChannelHandler handler) throws RemotingException;
 
     /**
      * Connect to a server.
@@ -54,5 +55,4 @@ public interface Transporter {
      */
     @Adaptive({Constants.CLIENT_KEY, Constants.TRANSPORTER_KEY})
     Client connect(URL url, ChannelHandler handler) throws RemotingException;
-
 }

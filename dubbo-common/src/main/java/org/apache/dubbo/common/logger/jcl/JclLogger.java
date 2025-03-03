@@ -19,16 +19,14 @@ package org.apache.dubbo.common.logger.jcl;
 import org.apache.dubbo.common.logger.Logger;
 
 import org.apache.commons.logging.Log;
-
-import java.io.Serializable;
+import org.slf4j.helpers.FormattingTuple;
+import org.slf4j.helpers.MessageFormatter;
 
 /**
  * Adaptor to commons logging, depends on commons-logging.jar. For more information about commons logging, pls. refer to
  * <a target="_blank" href="http://www.apache.org/">http://www.apache.org/</a>
  */
-public class JclLogger implements Logger, Serializable {
-
-    private static final long serialVersionUID = 1L;
+public class JclLogger implements Logger {
 
     private final Log logger;
 
@@ -39,6 +37,12 @@ public class JclLogger implements Logger, Serializable {
     @Override
     public void trace(String msg) {
         logger.trace(msg);
+    }
+
+    @Override
+    public void trace(String msg, Object... arguments) {
+        FormattingTuple ft = MessageFormatter.arrayFormat(msg, arguments);
+        logger.trace(ft.getMessage(), ft.getThrowable());
     }
 
     @Override
@@ -57,6 +61,12 @@ public class JclLogger implements Logger, Serializable {
     }
 
     @Override
+    public void debug(String msg, Object... arguments) {
+        FormattingTuple ft = MessageFormatter.arrayFormat(msg, arguments);
+        logger.debug(ft.getMessage(), ft.getThrowable());
+    }
+
+    @Override
     public void debug(Throwable e) {
         logger.debug(e);
     }
@@ -69,6 +79,12 @@ public class JclLogger implements Logger, Serializable {
     @Override
     public void info(String msg) {
         logger.info(msg);
+    }
+
+    @Override
+    public void info(String msg, Object... arguments) {
+        FormattingTuple ft = MessageFormatter.arrayFormat(msg, arguments);
+        logger.info(ft.getMessage(), ft.getThrowable());
     }
 
     @Override
@@ -87,6 +103,12 @@ public class JclLogger implements Logger, Serializable {
     }
 
     @Override
+    public void warn(String msg, Object... arguments) {
+        FormattingTuple ft = MessageFormatter.arrayFormat(msg, arguments);
+        logger.warn(ft.getMessage(), ft.getThrowable());
+    }
+
+    @Override
     public void warn(Throwable e) {
         logger.warn(e);
     }
@@ -99,6 +121,12 @@ public class JclLogger implements Logger, Serializable {
     @Override
     public void error(String msg) {
         logger.error(msg);
+    }
+
+    @Override
+    public void error(String msg, Object... arguments) {
+        FormattingTuple ft = MessageFormatter.arrayFormat(msg, arguments);
+        logger.error(ft.getMessage(), ft.getThrowable());
     }
 
     @Override
@@ -135,5 +163,4 @@ public class JclLogger implements Logger, Serializable {
     public boolean isErrorEnabled() {
         return logger.isErrorEnabled();
     }
-
 }

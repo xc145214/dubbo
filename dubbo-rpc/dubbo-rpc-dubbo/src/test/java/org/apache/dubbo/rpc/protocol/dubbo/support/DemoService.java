@@ -19,11 +19,9 @@ package org.apache.dubbo.rpc.protocol.dubbo.support;
 import java.util.Map;
 import java.util.Set;
 
-
 /**
  * <code>TestService</code>
  */
-
 public interface DemoService {
     void sayHello(String name);
 
@@ -51,7 +49,7 @@ public interface DemoService {
 
     String get(CustomArgument arg1);
 
-    byte getbyte(byte arg);
+    int getInt(int arg);
 
     void nonSerializedParameter(NonSerialized ns);
 
@@ -64,4 +62,8 @@ public interface DemoService {
     int getPerson(Person person1, Person perso2);
 
     String getPerson(Man man);
+
+    String getRemoteApplicationName();
+
+    byte[] download(int size);
 }

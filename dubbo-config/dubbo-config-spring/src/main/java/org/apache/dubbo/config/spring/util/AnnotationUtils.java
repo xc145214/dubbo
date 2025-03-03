@@ -16,19 +16,14 @@
  */
 package org.apache.dubbo.config.spring.util;
 
-import org.apache.dubbo.config.annotation.Reference;
-import org.apache.dubbo.config.annotation.Service;
-
-import org.springframework.core.env.Environment;
-import org.springframework.core.env.PropertyResolver;
-import org.springframework.util.StringUtils;
-
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,64 +32,39 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.springframework.core.annotation.AnnotationAttributes;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.PropertyResolver;
+import org.springframework.util.ClassUtils;
+
 import static java.lang.String.valueOf;
+import static java.util.Arrays.asList;
+import static org.springframework.core.annotation.AnnotationAttributes.fromMap;
 import static org.springframework.core.annotation.AnnotationUtils.findAnnotation;
-import static org.springframework.core.annotation.AnnotationUtils.getAnnotationAttributes;
 import static org.springframework.core.annotation.AnnotationUtils.getDefaultValue;
+import static org.springframework.util.ClassUtils.resolveClassName;
 import static org.springframework.util.CollectionUtils.arrayToList;
+import static org.springframework.util.CollectionUtils.isEmpty;
 import static org.springframework.util.ObjectUtils.nullSafeEquals;
+import static org.springframework.util.ReflectionUtils.findMethod;
+import static org.springframework.util.ReflectionUtils.invokeMethod;
 import static org.springframework.util.StringUtils.trimWhitespace;
 
 /**
- * Annotation Utilities Class
+ * {@link Annotation} Utilities
  *
- * @see org.springframework.core.annotation.AnnotationUtils
- * @since 2.5.11
+ * @author <a href="mailto:mercyblitz@gmail.com">Mercy</a>
+ * @see Annotation
+ * @since 2017.01.13
  */
-public class AnnotationUtils {
+@SuppressWarnings("unchecked")
+public abstract class AnnotationUtils {
 
-    public static String resolveInterfaceName(Service service, Class<?> defaultInterfaceClass)
-            throws IllegalStateException {
-
-        String interfaceName;
-        if (StringUtils.hasText(service.interfaceName())) {
-            interfaceName = service.interfaceName();
-        } else if (!void.class.equals(service.interfaceClass())) {
-            interfaceName = service.interfaceClass().getName();
-        } else if (defaultInterfaceClass.isInterface()) {
-            interfaceName = defaultInterfaceClass.getName();
-        } else {
-            throw new IllegalStateException(
-                    "The @Service undefined interfaceClass or interfaceName, and the type "
-                            + defaultInterfaceClass.getName() + " is not a interface.");
-        }
-
-        return interfaceName;
-
-    }
-
-    public static String resolveInterfaceName(Reference reference, Class<?> defaultInterfaceClass)
-            throws IllegalStateException {
-
-        String interfaceName;
-        if (!"".equals(reference.interfaceName())) {
-            interfaceName = reference.interfaceName();
-        } else if (!void.class.equals(reference.interfaceClass())) {
-            interfaceName = reference.interfaceClass().getName();
-        } else if (defaultInterfaceClass.isInterface()) {
-            interfaceName = defaultInterfaceClass.getName();
-        } else {
-            throw new IllegalStateException(
-                    "The @Reference undefined interfaceClass or interfaceName, and the type "
-                            + defaultInterfaceClass.getName() + " is not a interface.");
-        }
-
-        return interfaceName;
-
-    }
-
-
-    // Cloned from https://github.com/alibaba/spring-context-support/blob/1.0.2/src/main/java/com/alibaba/spring/util/AnnotationUtils.java
+    /**
+     * The class name of AnnotatedElementUtils that is introduced since Spring Framework 4
+     */
+    public static final String ANNOTATED_ELEMENT_UTILS_CLASS_NAME =
+            "org.springframework.core.annotation.AnnotatedElementUtils";
 
     /**
      * Is specified {@link Annotation} present on {@link Method}'s declaring class or parameters or itself.
@@ -103,14 +73,12 @@ public class AnnotationUtils {
      * @param annotationClass {@link Annotation} type
      * @param <A>             {@link Annotation} type
      * @return If present , return <code>true</code> , or <code>false</code>
-     * @since 2.6.6
      */
     public static <A extends Annotation> boolean isPresent(Method method, Class<A> annotationClass) {
 
         Map<ElementType, List<A>> annotationsMap = findAnnotations(method, annotationClass);
 
         return !annotationsMap.isEmpty();
-
     }
 
     /**
@@ -123,10 +91,9 @@ public class AnnotationUtils {
      * the list of {@link Annotation} as value.
      * If {@link Annotation} was annotated on {@link Method}'s parameters{@link ElementType#PARAMETER} ,
      * the associated {@link Annotation} list may contain multiple elements.
-     * @since 2.6.6
      */
-    public static <A extends Annotation> Map<ElementType, List<A>> findAnnotations(Method method,
-                                                                                   Class<A> annotationClass) {
+    public static <A extends Annotation> Map<ElementType, List<A>> findAnnotations(
+            Method method, Class<A> annotationClass) {
 
         Retention retention = annotationClass.getAnnotation(Retention.class);
 
@@ -142,15 +109,12 @@ public class AnnotationUtils {
 
         ElementType[] elementTypes = target.value();
 
-
         for (ElementType elementType : elementTypes) {
 
             List<A> annotationsList = new LinkedList<A>();
 
             switch (elementType) {
-
                 case PARAMETER:
-
                     Annotation[][] parameterAnnotations = method.getParameterAnnotations();
 
                     for (Annotation[] annotations : parameterAnnotations) {
@@ -160,29 +124,23 @@ public class AnnotationUtils {
                             if (annotationClass.equals(annotation.annotationType())) {
 
                                 annotationsList.add((A) annotation);
-
                             }
-
                         }
-
                     }
 
                     break;
 
                 case METHOD:
-
                     A annotation = findAnnotation(method, annotationClass);
 
                     if (annotation != null) {
 
                         annotationsList.add(annotation);
-
                     }
 
                     break;
 
                 case TYPE:
-
                     Class<?> beanType = method.getDeclaringClass();
 
                     A annotation2 = findAnnotation(beanType, annotationClass);
@@ -190,24 +148,18 @@ public class AnnotationUtils {
                     if (annotation2 != null) {
 
                         annotationsList.add(annotation2);
-
                     }
 
                     break;
-
             }
 
             if (!annotationsList.isEmpty()) {
 
                 annotationsMap.put(elementType, annotationsList);
-
             }
-
-
         }
 
         return Collections.unmodifiableMap(annotationsMap);
-
     }
 
     /**
@@ -217,10 +169,10 @@ public class AnnotationUtils {
      * @param ignoreDefaultValue   whether ignore default value or not
      * @param ignoreAttributeNames the attribute names of annotation should be ignored
      * @return non-null
-     * @since 2.6.6
+     * @since 1.0.2
      */
-    public static Map<String, Object> getAttributes(Annotation annotation, boolean ignoreDefaultValue,
-                                                    String... ignoreAttributeNames) {
+    public static Map<String, Object> getAttributes(
+            Annotation annotation, boolean ignoreDefaultValue, String... ignoreAttributeNames) {
         return getAttributes(annotation, null, ignoreDefaultValue, ignoreAttributeNames);
     }
 
@@ -232,40 +184,42 @@ public class AnnotationUtils {
      * @param ignoreDefaultValue   whether ignore default value or not
      * @param ignoreAttributeNames the attribute names of annotation should be ignored
      * @return non-null
-     * @since 2.6.6
+     * @since 1.0.2
      */
-    public static Map<String, Object> getAttributes(Annotation annotation, PropertyResolver propertyResolver,
-                                                    boolean ignoreDefaultValue, String... ignoreAttributeNames) {
+    public static Map<String, Object> getAttributes(
+            Annotation annotation,
+            PropertyResolver propertyResolver,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        return getAttributes(annotation, propertyResolver, false, false, ignoreDefaultValue, ignoreAttributeNames);
+    }
 
-        Set<String> ignoreAttributeNamesSet = new HashSet<String>(arrayToList(ignoreAttributeNames));
+    /**
+     * Get the {@link Annotation} attributes
+     *
+     * @param annotationAttributes the attributes of specified {@link Annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return non-null
+     * @since 1.0.4
+     */
+    public static Map<String, Object> getAttributes(
+            Map<String, Object> annotationAttributes,
+            PropertyResolver propertyResolver,
+            String... ignoreAttributeNames) {
 
-        Map<String, Object> attributes = getAnnotationAttributes(annotation);
+        Set<String> ignoreAttributeNamesSet =
+                new HashSet<String>((Collection<? extends String>) arrayToList(ignoreAttributeNames));
 
         Map<String, Object> actualAttributes = new LinkedHashMap<String, Object>();
 
-        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+        for (Map.Entry<String, Object> annotationAttribute : annotationAttributes.entrySet()) {
 
-            String attributeName = entry.getKey();
-            Object attributeValue = entry.getValue();
-
-            // ignore default attribute value
-            if (ignoreDefaultValue && nullSafeEquals(attributeValue, getDefaultValue(annotation, attributeName))) {
-                continue;
-            }
+            String attributeName = annotationAttribute.getKey();
+            Object attributeValue = annotationAttribute.getValue();
 
             // ignore attribute name
             if (ignoreAttributeNamesSet.contains(attributeName)) {
-                continue;
-            }
-
-            /**
-             * @since 2.7.1
-             * ignore annotation member
-             */
-            if (attributeValue.getClass().isAnnotation()){
-                continue;
-            }
-            if (attributeValue.getClass().isArray() && attributeValue.getClass().getComponentType().isAnnotation()){
                 continue;
             }
 
@@ -283,6 +237,53 @@ public class AnnotationUtils {
         return actualAttributes;
     }
 
+    /**
+     * @param annotation             specified {@link Annotation}
+     * @param propertyResolver       {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param classValuesAsString    whether to turn Class references into Strings (for
+     *                               compatibility with {@link org.springframework.core.type.AnnotationMetadata} or to
+     *                               preserve them as Class references
+     * @param nestedAnnotationsAsMap whether to turn nested Annotation instances into
+     *                               {@link AnnotationAttributes} maps (for compatibility with
+     *                               {@link org.springframework.core.type.AnnotationMetadata} or to preserve them as
+     *                               Annotation instances
+     * @param ignoreDefaultValue     whether ignore default value or not
+     * @param ignoreAttributeNames   the attribute names of annotation should be ignored
+     * @return
+     * @since 1.0.11
+     */
+    public static Map<String, Object> getAttributes(
+            Annotation annotation,
+            PropertyResolver propertyResolver,
+            boolean classValuesAsString,
+            boolean nestedAnnotationsAsMap,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+
+        Map<String, Object> annotationAttributes =
+                org.springframework.core.annotation.AnnotationUtils.getAnnotationAttributes(
+                        annotation, classValuesAsString, nestedAnnotationsAsMap);
+
+        String[] actualIgnoreAttributeNames = ignoreAttributeNames;
+
+        if (ignoreDefaultValue && !isEmpty(annotationAttributes)) {
+
+            List<String> attributeNamesToIgnore = new LinkedList<String>(asList(ignoreAttributeNames));
+
+            for (Map.Entry<String, Object> annotationAttribute : annotationAttributes.entrySet()) {
+                String attributeName = annotationAttribute.getKey();
+                Object attributeValue = annotationAttribute.getValue();
+                if (nullSafeEquals(attributeValue, getDefaultValue(annotation, attributeName))) {
+                    attributeNamesToIgnore.add(attributeName);
+                }
+            }
+            // extends the ignored list
+            actualIgnoreAttributeNames = attributeNamesToIgnore.toArray(new String[attributeNamesToIgnore.size()]);
+        }
+
+        return getAttributes(annotationAttributes, propertyResolver, actualIgnoreAttributeNames);
+    }
+
     private static String resolvePlaceholders(String attributeValue, PropertyResolver propertyResolver) {
         String resolvedValue = attributeValue;
         if (propertyResolver != null) {
@@ -292,4 +293,429 @@ public class AnnotationUtils {
         return resolvedValue;
     }
 
+    /**
+     * Get the attribute value
+     *
+     * @param annotation    {@link Annotation annotation}
+     * @param attributeName the name of attribute
+     * @param <T>           the type of attribute value
+     * @return the attribute value if found
+     * @since 1.0.3
+     */
+    public static <T> T getAttribute(Annotation annotation, String attributeName) {
+        return getAttribute(
+                org.springframework.core.annotation.AnnotationUtils.getAnnotationAttributes(annotation), attributeName);
+    }
+
+    /**
+     * Get the attribute value
+     *
+     * @param attributes    {@link Map the annotation attributes} or {@link AnnotationAttributes}
+     * @param attributeName the name of attribute
+     * @param <T>           the type of attribute value
+     * @return the attribute value if found
+     * @since 1.0.3
+     */
+    public static <T> T getAttribute(Map<String, Object> attributes, String attributeName) {
+        return getAttribute(attributes, attributeName, false);
+    }
+
+    /**
+     * Get the attribute value the will
+     *
+     * @param attributes    {@link Map the annotation attributes} or {@link AnnotationAttributes}
+     * @param attributeName the name of attribute
+     * @param required      the required attribute or not
+     * @param <T>           the type of attribute value
+     * @return the attribute value if found
+     * @throws IllegalStateException if attribute value can't be found
+     * @since 1.0.6
+     */
+    public static <T> T getAttribute(Map<String, Object> attributes, String attributeName, boolean required) {
+        T value = getAttribute(attributes, attributeName, null);
+        if (required && value == null) {
+            throw new IllegalStateException("The attribute['" + attributeName + "] is required!");
+        }
+        return value;
+    }
+
+    /**
+     * Get the attribute value with default value
+     *
+     * @param attributes    {@link Map the annotation attributes} or {@link AnnotationAttributes}
+     * @param attributeName the name of attribute
+     * @param defaultValue  the default value of attribute
+     * @param <T>           the type of attribute value
+     * @return the attribute value if found
+     * @since 1.0.6
+     */
+    public static <T> T getAttribute(Map<String, Object> attributes, String attributeName, T defaultValue) {
+        T value = (T) attributes.get(attributeName);
+        return value == null ? defaultValue : value;
+    }
+
+    /**
+     * Get the required attribute value
+     *
+     * @param attributes    {@link Map the annotation attributes} or {@link AnnotationAttributes}
+     * @param attributeName the name of attribute
+     * @param <T>           the type of attribute value
+     * @return the attribute value if found
+     * @throws IllegalStateException if attribute value can't be found
+     * @since 1.0.6
+     */
+    public static <T> T getRequiredAttribute(Map<String, Object> attributes, String attributeName) {
+        return getAttribute(attributes, attributeName, true);
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}
+     *
+     * @param annotation           specified {@link Annotation}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return non-null
+     * @see #getAnnotationAttributes(Annotation, PropertyResolver, boolean, String...)
+     * @since 1.0.3
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            Annotation annotation, boolean ignoreDefaultValue, String... ignoreAttributeNames) {
+        return getAnnotationAttributes(annotation, null, ignoreDefaultValue, ignoreAttributeNames);
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}
+     *
+     * @param annotation             specified {@link Annotation}
+     * @param propertyResolver       {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param classValuesAsString    whether to turn Class references into Strings (for
+     *                               compatibility with {@link org.springframework.core.type.AnnotationMetadata} or to
+     *                               preserve them as Class references
+     * @param nestedAnnotationsAsMap whether to turn nested Annotation instances into
+     *                               {@link AnnotationAttributes} maps (for compatibility with
+     *                               {@link org.springframework.core.type.AnnotationMetadata} or to preserve them as
+     *                               Annotation instances
+     * @param ignoreAttributeNames   the attribute names of annotation should be ignored
+     * @param ignoreDefaultValue     whether ignore default value or not
+     * @return non-null
+     * @see #getAttributes(Annotation, PropertyResolver, boolean, String...)
+     * @see #getAnnotationAttributes(AnnotatedElement, Class, PropertyResolver, boolean, String...)
+     * @since 1.0.11
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            Annotation annotation,
+            PropertyResolver propertyResolver,
+            boolean classValuesAsString,
+            boolean nestedAnnotationsAsMap,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        return fromMap(getAttributes(
+                annotation,
+                propertyResolver,
+                classValuesAsString,
+                nestedAnnotationsAsMap,
+                ignoreDefaultValue,
+                ignoreAttributeNames));
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}
+     *
+     * @param annotation           specified {@link Annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return non-null
+     * @see #getAttributes(Annotation, PropertyResolver, boolean, String...)
+     * @see #getAnnotationAttributes(AnnotatedElement, Class, PropertyResolver, boolean, String...)
+     * @since 1.0.3
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            Annotation annotation,
+            PropertyResolver propertyResolver,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        return getAnnotationAttributes(
+                annotation, propertyResolver, false, false, ignoreDefaultValue, ignoreAttributeNames);
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}
+     *
+     * @param annotatedElement     {@link AnnotatedElement the annotated element}
+     * @param annotationType       the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return if <code>annotatedElement</code> can't be found in <code>annotatedElement</code>, return <code>null</code>
+     * @since 1.0.3
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            PropertyResolver propertyResolver,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        return getAnnotationAttributes(
+                annotatedElement,
+                annotationType,
+                propertyResolver,
+                false,
+                false,
+                ignoreDefaultValue,
+                ignoreAttributeNames);
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}
+     *
+     * @param annotatedElement     {@link AnnotatedElement the annotated element}
+     * @param annotationType       the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return if <code>annotatedElement</code> can't be found in <code>annotatedElement</code>, return <code>null</code>
+     * @since 1.0.11
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            PropertyResolver propertyResolver,
+            boolean classValuesAsString,
+            boolean nestedAnnotationsAsMap,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        Annotation annotation = annotatedElement.getAnnotation(annotationType);
+        return annotation == null
+                ? null
+                : getAnnotationAttributes(
+                        annotation,
+                        propertyResolver,
+                        classValuesAsString,
+                        nestedAnnotationsAsMap,
+                        ignoreDefaultValue,
+                        ignoreAttributeNames);
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}, if the argument <code>tryMergedAnnotation</code> is <code>true</code>,
+     * the {@link AnnotationAttributes} will be got from
+     * {@link #tryGetMergedAnnotationAttributes(AnnotatedElement, Class, PropertyResolver, boolean, String...) merged annotation} first,
+     * if failed, and then to get from
+     * {@link #getAnnotationAttributes(AnnotatedElement, Class, PropertyResolver, boolean, boolean, String...) normal one}
+     *
+     * @param annotatedElement     {@link AnnotatedElement the annotated element}
+     * @param annotationType       the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param tryMergedAnnotation  whether try merged annotation or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return if <code>annotatedElement</code> can't be found in <code>annotatedElement</code>, return <code>null</code>
+     * @since 1.0.3
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            PropertyResolver propertyResolver,
+            boolean ignoreDefaultValue,
+            boolean tryMergedAnnotation,
+            String... ignoreAttributeNames) {
+        return getAnnotationAttributes(
+                annotatedElement,
+                annotationType,
+                propertyResolver,
+                false,
+                false,
+                ignoreDefaultValue,
+                tryMergedAnnotation,
+                ignoreAttributeNames);
+    }
+
+    /**
+     * Get the {@link AnnotationAttributes}, if the argument <code>tryMergedAnnotation</code> is <code>true</code>,
+     * the {@link AnnotationAttributes} will be got from
+     * {@link #tryGetMergedAnnotationAttributes(AnnotatedElement, Class, PropertyResolver, boolean, String...) merged annotation} first,
+     * if failed, and then to get from
+     * {@link #getAnnotationAttributes(AnnotatedElement, Class, PropertyResolver, boolean, boolean, String...) normal one}
+     *
+     * @param annotatedElement       {@link AnnotatedElement the annotated element}
+     * @param annotationType         the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param propertyResolver       {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param classValuesAsString    whether to turn Class references into Strings (for
+     *                               compatibility with {@link org.springframework.core.type.AnnotationMetadata} or to
+     *                               preserve them as Class references
+     * @param nestedAnnotationsAsMap whether to turn nested Annotation instances into
+     *                               {@link AnnotationAttributes} maps (for compatibility with
+     *                               {@link org.springframework.core.type.AnnotationMetadata} or to preserve them as
+     *                               Annotation instances
+     * @param ignoreDefaultValue     whether ignore default value or not
+     * @param tryMergedAnnotation    whether try merged annotation or not
+     * @param ignoreAttributeNames   the attribute names of annotation should be ignored
+     * @return if <code>annotatedElement</code> can't be found in <code>annotatedElement</code>, return <code>null</code>
+     * @since 1.0.11
+     */
+    public static AnnotationAttributes getAnnotationAttributes(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            PropertyResolver propertyResolver,
+            boolean classValuesAsString,
+            boolean nestedAnnotationsAsMap,
+            boolean ignoreDefaultValue,
+            boolean tryMergedAnnotation,
+            String... ignoreAttributeNames) {
+
+        AnnotationAttributes attributes = null;
+
+        if (tryMergedAnnotation) {
+            attributes = tryGetMergedAnnotationAttributes(
+                    annotatedElement,
+                    annotationType,
+                    propertyResolver,
+                    classValuesAsString,
+                    nestedAnnotationsAsMap,
+                    ignoreDefaultValue,
+                    ignoreAttributeNames);
+        }
+
+        if (attributes == null) {
+            attributes = getAnnotationAttributes(
+                    annotatedElement,
+                    annotationType,
+                    propertyResolver,
+                    classValuesAsString,
+                    nestedAnnotationsAsMap,
+                    ignoreDefaultValue,
+                    ignoreAttributeNames);
+        }
+
+        return attributes;
+    }
+
+    /**
+     * Try to get the merged {@link Annotation annotation}
+     *
+     * @param annotatedElement {@link AnnotatedElement the annotated element}
+     * @param annotationType   the {@link Class tyoe} pf {@link Annotation annotation}
+     * @return If current version of Spring Framework is below 4.2, return <code>null</code>
+     * @since 1.0.3
+     */
+    public static Annotation tryGetMergedAnnotation(
+            AnnotatedElement annotatedElement, Class<? extends Annotation> annotationType) {
+        return tryGetMergedAnnotation(annotatedElement, annotationType, false, false);
+    }
+
+    /**
+     * Try to get the merged {@link Annotation annotation}
+     *
+     * @param annotatedElement       {@link AnnotatedElement the annotated element}
+     * @param annotationType         the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param classValuesAsString    whether to turn Class references into Strings (for
+     *                               compatibility with {@link org.springframework.core.type.AnnotationMetadata} or to
+     *                               preserve them as Class references
+     * @param nestedAnnotationsAsMap whether to turn nested Annotation instances into
+     *                               {@link AnnotationAttributes} maps (for compatibility with
+     *                               {@link org.springframework.core.type.AnnotationMetadata} or to preserve them as
+     *                               Annotation instances
+     * @return If current version of Spring Framework is below 4.2, return <code>null</code>
+     * @since 1.0.11
+     */
+    public static Annotation tryGetMergedAnnotation(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            boolean classValuesAsString,
+            boolean nestedAnnotationsAsMap) {
+
+        Annotation mergedAnnotation = null;
+
+        ClassLoader classLoader = annotationType.getClassLoader();
+
+        if (ClassUtils.isPresent(ANNOTATED_ELEMENT_UTILS_CLASS_NAME, classLoader)) {
+            Class<?> annotatedElementUtilsClass = resolveClassName(ANNOTATED_ELEMENT_UTILS_CLASS_NAME, classLoader);
+            // getMergedAnnotation method appears in the Spring Framework 4.2
+            Method getMergedAnnotationMethod = findMethod(
+                    annotatedElementUtilsClass,
+                    "getMergedAnnotation",
+                    AnnotatedElement.class,
+                    Class.class,
+                    boolean.class,
+                    boolean.class);
+            if (getMergedAnnotationMethod != null) {
+                mergedAnnotation = (Annotation) invokeMethod(
+                        getMergedAnnotationMethod,
+                        null,
+                        annotatedElement,
+                        annotationType,
+                        classValuesAsString,
+                        nestedAnnotationsAsMap);
+            }
+        }
+
+        return mergedAnnotation;
+    }
+
+    /**
+     * Try to get {@link AnnotationAttributes the annotation attributes} after merging and resolving the placeholders
+     *
+     * @param annotatedElement     {@link AnnotatedElement the annotated element}
+     * @param annotationType       the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param propertyResolver     {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param ignoreDefaultValue   whether ignore default value or not
+     * @param ignoreAttributeNames the attribute names of annotation should be ignored
+     * @return If the specified annotation type is not found, return <code>null</code>
+     * @since 1.0.3
+     */
+    public static AnnotationAttributes tryGetMergedAnnotationAttributes(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            PropertyResolver propertyResolver,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        return tryGetMergedAnnotationAttributes(
+                annotatedElement,
+                annotationType,
+                propertyResolver,
+                false,
+                false,
+                ignoreDefaultValue,
+                ignoreAttributeNames);
+    }
+
+    /**
+     * Try to get {@link AnnotationAttributes the annotation attributes} after merging and resolving the placeholders
+     *
+     * @param annotatedElement       {@link AnnotatedElement the annotated element}
+     * @param annotationType         the {@link Class tyoe} pf {@link Annotation annotation}
+     * @param propertyResolver       {@link PropertyResolver} instance, e.g {@link Environment}
+     * @param classValuesAsString    whether to turn Class references into Strings (for
+     *                               compatibility with {@link org.springframework.core.type.AnnotationMetadata} or to
+     *                               preserve them as Class references
+     * @param nestedAnnotationsAsMap whether to turn nested Annotation instances into
+     *                               {@link AnnotationAttributes} maps (for compatibility with
+     *                               {@link org.springframework.core.type.AnnotationMetadata} or to preserve them as
+     *                               Annotation instances
+     * @param ignoreDefaultValue     whether ignore default value or not
+     * @param ignoreAttributeNames   the attribute names of annotation should be ignored
+     * @return If the specified annotation type is not found, return <code>null</code>
+     * @since 1.0.11
+     */
+    public static AnnotationAttributes tryGetMergedAnnotationAttributes(
+            AnnotatedElement annotatedElement,
+            Class<? extends Annotation> annotationType,
+            PropertyResolver propertyResolver,
+            boolean classValuesAsString,
+            boolean nestedAnnotationsAsMap,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        Annotation annotation =
+                tryGetMergedAnnotation(annotatedElement, annotationType, classValuesAsString, nestedAnnotationsAsMap);
+        return annotation == null
+                ? null
+                : getAnnotationAttributes(
+                        annotation,
+                        propertyResolver,
+                        classValuesAsString,
+                        nestedAnnotationsAsMap,
+                        ignoreDefaultValue,
+                        ignoreAttributeNames);
+    }
 }

@@ -16,15 +16,16 @@
  */
 package org.apache.dubbo.rpc;
 
+import javax.naming.LimitExceededException;
+
 /**
  * RPC Exception. (API, Prototype, ThreadSafe)
  *
  * @serial Don't change the class name and properties.
- * @export
  * @see org.apache.dubbo.rpc.Invoker#invoke(Invocation)
  * @since 1.0
  */
-public /**final**/ class RpcException extends RuntimeException {
+public class RpcException extends RuntimeException {
 
     public static final int UNKNOWN_EXCEPTION = 0;
     public static final int NETWORK_EXCEPTION = 1;
@@ -33,6 +34,13 @@ public /**final**/ class RpcException extends RuntimeException {
     public static final int FORBIDDEN_EXCEPTION = 4;
     public static final int SERIALIZATION_EXCEPTION = 5;
     public static final int NO_INVOKER_AVAILABLE_AFTER_FILTER = 6;
+    public static final int LIMIT_EXCEEDED_EXCEPTION = 7;
+    public static final int TIMEOUT_TERMINATE = 8;
+    public static final int REGISTRY_EXCEPTION = 9;
+    public static final int ROUTER_CACHE_NOT_BUILD = 10;
+    public static final int METHOD_NOT_FOUND = 11;
+    public static final int VALIDATION_EXCEPTION = 12;
+    public static final int AUTHORIZATION_EXCEPTION = 13;
     private static final long serialVersionUID = 7815426752583648734L;
     /**
      * RpcException cannot be extended, use error code for exception type to keep compatibility
@@ -87,7 +95,7 @@ public /**final**/ class RpcException extends RuntimeException {
         return code == BIZ_EXCEPTION;
     }
 
-    public boolean isForbidded() {
+    public boolean isForbidden() {
         return code == FORBIDDEN_EXCEPTION;
     }
 
@@ -103,7 +111,19 @@ public /**final**/ class RpcException extends RuntimeException {
         return code == SERIALIZATION_EXCEPTION;
     }
 
+    public boolean isAuthorization() {
+        return code == AUTHORIZATION_EXCEPTION;
+    }
+
     public boolean isNoInvokerAvailableAfterFilter() {
         return code == NO_INVOKER_AVAILABLE_AFTER_FILTER;
+    }
+
+    public boolean isLimitExceed() {
+        return code == LIMIT_EXCEEDED_EXCEPTION || getCause() instanceof LimitExceededException;
+    }
+
+    public boolean isValidation() {
+        return code == VALIDATION_EXCEPTION;
     }
 }

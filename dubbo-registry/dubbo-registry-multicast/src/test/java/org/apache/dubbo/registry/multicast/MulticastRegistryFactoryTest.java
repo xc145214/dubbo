@@ -18,14 +18,17 @@ package org.apache.dubbo.registry.multicast;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.registry.Registry;
+
 import org.junit.jupiter.api.Test;
 
-import static org.hamcrest.CoreMatchers.*;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.not;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 
-public class MulticastRegistryFactoryTest {
+class MulticastRegistryFactoryTest {
     @Test
-    public void shouldCreateRegistry() {
+    void shouldCreateRegistry() {
         Registry registry = new MulticastRegistryFactory().createRegistry(URL.valueOf("multicast://239.255.255.255/"));
         assertThat(registry, not(nullValue()));
         assertThat(registry.isAvailable(), is(true));

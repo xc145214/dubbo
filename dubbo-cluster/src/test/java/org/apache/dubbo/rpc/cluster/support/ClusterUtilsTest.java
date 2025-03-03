@@ -18,31 +18,45 @@ package org.apache.dubbo.rpc.cluster.support;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.URLBuilder;
+import org.apache.dubbo.rpc.model.ApplicationModel;
+
+import java.util.Map;
 
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.apache.dubbo.common.constants.CommonConstants.ALIVE_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.APPLICATION_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.CORE_THREADS_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.DEFAULT_KEY_PREFIX;
+import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_PROTOCOL;
+import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_VERSION_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.GROUP_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.PID_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.QUEUES_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.REFERENCE_FILTER_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.TAG_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.THREADPOOL_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.THREADS_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.THREAD_NAME_KEY;
+import static org.apache.dubbo.common.constants.CommonConstants.URL_MERGE_PROCESSOR_KEY;
 import static org.apache.dubbo.common.constants.CommonConstants.VERSION_KEY;
-import static org.apache.dubbo.common.constants.CommonConstants.DUBBO_PROTOCOL;
-import static org.apache.dubbo.remoting.Constants.DUBBO_VERSION_KEY;
 
-public class ClusterUtilsTest {
+class ClusterUtilsTest {
+
+    private ClusterUtils clusterUtils;
+
+    @BeforeEach
+    public void setup() {
+        clusterUtils = new ClusterUtils();
+        clusterUtils.setApplicationModel(ApplicationModel.defaultModel());
+    }
 
     @Test
-    public void testMergeUrl() throws Exception {
+    void testMergeUrl() {
         URL providerURL = URL.valueOf("dubbo://localhost:55555");
-        providerURL = providerURL.setPath("path")
-                .setUsername("username")
-                .setPassword("password");
+        providerURL = providerURL.setPath("path").setUsername("username").setPassword("password");
 
         providerURL = URLBuilder.from(providerURL)
                 .addParameter(GROUP_KEY, "dubbo")
@@ -60,14 +74,21 @@ public class ClusterUtilsTest {
                 .addParameter(DEFAULT_KEY_PREFIX + QUEUES_KEY, Integer.MAX_VALUE)
                 .addParameter(DEFAULT_KEY_PREFIX + ALIVE_KEY, Integer.MAX_VALUE)
                 .addParameter(DEFAULT_KEY_PREFIX + THREAD_NAME_KEY, "test")
+                .addParameter(APPLICATION_KEY, "provider")
+                .addParameter(REFERENCE_FILTER_KEY, "filter1,filter2")
+                .addParameter(TAG_KEY, "TTT")
                 .build();
 
+        // Verify default ProviderURLMergeProcessor
         URL consumerURL = new URLBuilder(DUBBO_PROTOCOL, "localhost", 55555)
                 .addParameter(PID_KEY, "1234")
                 .addParameter(THREADPOOL_KEY, "foo")
+                .addParameter(APPLICATION_KEY, "consumer")
+                .addParameter(REFERENCE_FILTER_KEY, "filter3")
+                .addParameter(TAG_KEY, "UUU")
                 .build();
 
-        URL url = ClusterUtils.mergeUrl(providerURL, consumerURL.getParameters());
+        URL url = clusterUtils.mergeUrl(providerURL, consumerURL.getParameters());
 
         Assertions.assertFalse(url.hasParameter(THREADS_KEY));
         Assertions.assertFalse(url.hasParameter(DEFAULT_KEY_PREFIX + THREADS_KEY));
@@ -86,11 +107,67 @@ public class ClusterUtilsTest {
         Assertions.assertFalse(url.hasParameter(THREAD_NAME_KEY));
         Assertions.assertFalse(url.hasParameter(DEFAULT_KEY_PREFIX + THREAD_NAME_KEY));
 
-        Assertions.assertEquals(url.getPath(), "path");
-        Assertions.assertEquals(url.getUsername(), "username");
-        Assertions.assertEquals(url.getPassword(), "password");
-        Assertions.assertEquals(url.getParameter(PID_KEY), "1234");
-        Assertions.assertEquals(url.getParameter(THREADPOOL_KEY), "foo");
+        Assertions.assertEquals("path", url.getPath());
+        Assertions.assertEquals("username", url.getUsername());
+        Assertions.assertEquals("password", url.getPassword());
+        Assertions.assertEquals("1234", url.getParameter(PID_KEY));
+        Assertions.assertEquals("foo", url.getParameter(THREADPOOL_KEY));
+        Assertions.assertEquals("consumer", url.getApplication());
+        Assertions.assertEquals("provider", url.getRemoteApplication());
+        Assertions.assertEquals("filter1,filter2,filter3", url.getParameter(REFERENCE_FILTER_KEY));
+
+        Assertions.assertEquals("TTT", url.getParameter(TAG_KEY));
+
+        // Verify custom ProviderURLMergeProcessor
+        URL consumerUrlForTag = new URLBuilder(DUBBO_PROTOCOL, "localhost", 55555)
+                .addParameter(PID_KEY, "1234")
+                .addParameter(THREADPOOL_KEY, "foo")
+                .addParameter(APPLICATION_KEY, "consumer")
+                .addParameter(REFERENCE_FILTER_KEY, "filter3")
+                .addParameter(TAG_KEY, "UUU")
+                .addParameter(URL_MERGE_PROCESSOR_KEY, "tag")
+                .build();
+
+        URL urlForTag = clusterUtils.mergeUrl(providerURL, consumerUrlForTag.getParameters());
+        Assertions.assertEquals("UUU", urlForTag.getParameter(TAG_KEY));
     }
 
+    @Test
+    void testMergeLocalParams() {
+
+        // Verify default ProviderURLMergeProcessor
+        URL consumerURL = new URLBuilder(DUBBO_PROTOCOL, "localhost", 55555)
+                .addParameter(PID_KEY, "1234")
+                .addParameter(THREADPOOL_KEY, "foo")
+                .addParameter(APPLICATION_KEY, "consumer")
+                .addParameter(REFERENCE_FILTER_KEY, "filter3")
+                .addParameter(TAG_KEY, "UUU")
+                .build();
+
+        Map<String, String> params = clusterUtils.mergeLocalParams(consumerURL.getParameters());
+
+        Assertions.assertEquals("1234", params.get(PID_KEY));
+        Assertions.assertEquals("foo", params.get(THREADPOOL_KEY));
+        Assertions.assertEquals("consumer", params.get(APPLICATION_KEY));
+        Assertions.assertEquals("filter3", params.get(REFERENCE_FILTER_KEY));
+        Assertions.assertEquals("UUU", params.get(TAG_KEY));
+
+        // Verify custom ProviderURLMergeProcessor
+        URL consumerUrlForTag = new URLBuilder(DUBBO_PROTOCOL, "localhost", 55555)
+                .addParameter(PID_KEY, "1234")
+                .addParameter(THREADPOOL_KEY, "foo")
+                .addParameter(APPLICATION_KEY, "consumer")
+                .addParameter(REFERENCE_FILTER_KEY, "filter3")
+                .addParameter(TAG_KEY, "UUU")
+                .addParameter(URL_MERGE_PROCESSOR_KEY, "tag")
+                .build();
+
+        Map<String, String> paramsForTag = clusterUtils.mergeLocalParams(consumerUrlForTag.getParameters());
+
+        Assertions.assertEquals("1234", paramsForTag.get(PID_KEY));
+        Assertions.assertEquals("foo", paramsForTag.get(THREADPOOL_KEY));
+        Assertions.assertEquals("consumer", paramsForTag.get(APPLICATION_KEY));
+        Assertions.assertEquals("filter3", paramsForTag.get(REFERENCE_FILTER_KEY));
+        Assertions.assertNull(paramsForTag.get(TAG_KEY));
+    }
 }

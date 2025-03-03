@@ -14,7 +14,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package org.apache.dubbo.rpc.support;
 
 import org.apache.dubbo.common.URL;
@@ -28,6 +27,7 @@ public class RuntimeExceptionInvoker extends MyInvoker {
         super(url);
     }
 
+    @Override
     public Result invoke(Invocation invocation) throws RpcException {
         throw new RuntimeException("Runtime exception");
     }

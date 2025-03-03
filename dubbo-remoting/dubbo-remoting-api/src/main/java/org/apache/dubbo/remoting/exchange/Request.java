@@ -17,19 +17,21 @@
 package org.apache.dubbo.remoting.exchange;
 
 import org.apache.dubbo.common.utils.StringUtils;
+import org.apache.dubbo.common.utils.SystemPropertyConfigUtils;
 
+import java.security.SecureRandom;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
+
+import static org.apache.dubbo.common.constants.CommonConstants.DubboProperty.DUBBO_USE_SECURE_RANDOM_ID;
+import static org.apache.dubbo.common.constants.CommonConstants.HEARTBEAT_EVENT;
 
 /**
  * Request.
  */
 public class Request {
 
-    public static final String HEARTBEAT_EVENT = null;
-
-    public static final String READONLY_EVENT = "R";
-
-    private static final AtomicLong INVOKE_ID = new AtomicLong(0);
+    private static final AtomicLong INVOKE_ID;
 
     private final long mId;
 
@@ -41,6 +43,8 @@ public class Request {
 
     private boolean mBroken = false;
 
+    private int mPayload;
+
     private Object mData;
 
     public Request() {
@@ -49,6 +53,18 @@ public class Request {
 
     public Request(long id) {
         mId = id;
+    }
+
+    static {
+        long startID = ThreadLocalRandom.current().nextLong();
+        if (Boolean.parseBoolean(SystemPropertyConfigUtils.getSystemProperty(DUBBO_USE_SECURE_RANDOM_ID, "false"))) {
+            try {
+                SecureRandom rand = new SecureRandom(SecureRandom.getSeed(20));
+                startID = rand.nextLong();
+            } catch (Throwable ignore) {
+            }
+        }
+        INVOKE_ID = new AtomicLong(startID);
     }
 
     private static long newId() {
@@ -60,14 +76,12 @@ public class Request {
         if (data == null) {
             return null;
         }
-        String dataStr;
+
         try {
-            dataStr = data.toString();
-        } catch (Throwable e) {
-            dataStr = "<Fail toString of " + data.getClass() + ", cause: " +
-                    StringUtils.toString(e) + ">";
+            return data.toString();
+        } catch (Exception e) {
+            return "<Fail toString of " + data.getClass() + ", cause: " + StringUtils.toString(e) + ">";
         }
-        return dataStr;
     }
 
     public long getId() {
@@ -111,6 +125,14 @@ public class Request {
         this.mBroken = mBroken;
     }
 
+    public int getPayload() {
+        return mPayload;
+    }
+
+    public void setPayload(int mPayload) {
+        this.mPayload = mPayload;
+    }
+
     public Object getData() {
         return mData;
     }
@@ -129,9 +151,31 @@ public class Request {
         }
     }
 
+    public Request copy() {
+        Request copy = new Request(mId);
+        copy.mVersion = this.mVersion;
+        copy.mTwoWay = this.mTwoWay;
+        copy.mEvent = this.mEvent;
+        copy.mBroken = this.mBroken;
+        copy.mPayload = this.mPayload;
+        copy.mData = this.mData;
+        return copy;
+    }
+
+    public Request copyWithoutData() {
+        Request copy = new Request(mId);
+        copy.mVersion = this.mVersion;
+        copy.mTwoWay = this.mTwoWay;
+        copy.mEvent = this.mEvent;
+        copy.mBroken = this.mBroken;
+        copy.mPayload = this.mPayload;
+        return copy;
+    }
+
     @Override
     public String toString() {
-        return "Request [id=" + mId + ", version=" + mVersion + ", twoway=" + mTwoWay + ", event=" + mEvent
-                + ", broken=" + mBroken + ", data=" + (mData == this ? "this" : safeToString(mData)) + "]";
+        return "Request [id=" + mId + ", version=" + mVersion + ", twoWay=" + mTwoWay + ", event=" + mEvent
+                + ", broken=" + mBroken + ", mPayload=" + mPayload + ", data="
+                + (mData == this ? "this" : safeToString(mData)) + "]";
     }
 }

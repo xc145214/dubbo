@@ -16,14 +16,15 @@
  */
 package org.apache.dubbo.config.spring.beans.factory.annotation;
 
+import org.apache.dubbo.config.spring.util.AnnotationUtils;
+
+import java.lang.annotation.Annotation;
+import java.util.Map;
+
 import org.springframework.beans.MutablePropertyValues;
 import org.springframework.beans.PropertyValue;
 import org.springframework.beans.PropertyValues;
 import org.springframework.core.env.PropertyResolver;
-
-import java.lang.annotation.Annotation;
-
-import static org.apache.dubbo.config.spring.util.AnnotationUtils.getAttributes;
 
 /**
  * {@link Annotation} {@link PropertyValues} Adapter
@@ -32,37 +33,34 @@ import static org.apache.dubbo.config.spring.util.AnnotationUtils.getAttributes;
  * @see PropertyValues
  * @since 2.5.11
  */
-class AnnotationPropertyValuesAdapter implements PropertyValues {
-
-    private final Annotation annotation;
-
-    private final PropertyResolver propertyResolver;
-
-    private final boolean ignoreDefaultValue;
+public class AnnotationPropertyValuesAdapter implements PropertyValues {
 
     private final PropertyValues delegate;
 
-    public AnnotationPropertyValuesAdapter(Annotation annotation, PropertyResolver propertyResolver, boolean ignoreDefaultValue, String... ignoreAttributeNames) {
-        this.annotation = annotation;
-        this.propertyResolver = propertyResolver;
-        this.ignoreDefaultValue = ignoreDefaultValue;
-        this.delegate = adapt(annotation, ignoreDefaultValue, ignoreAttributeNames);
+    /**
+     * @param attributes
+     * @param propertyResolver
+     * @param ignoreAttributeNames
+     * @since 2.7.3
+     */
+    public AnnotationPropertyValuesAdapter(
+            Map<String, Object> attributes, PropertyResolver propertyResolver, String... ignoreAttributeNames) {
+        this.delegate = new MutablePropertyValues(
+                AnnotationUtils.getAttributes(attributes, propertyResolver, ignoreAttributeNames));
     }
 
-    public AnnotationPropertyValuesAdapter(Annotation annotation, PropertyResolver propertyResolver, String... ignoreAttributeNames) {
+    public AnnotationPropertyValuesAdapter(
+            Annotation annotation,
+            PropertyResolver propertyResolver,
+            boolean ignoreDefaultValue,
+            String... ignoreAttributeNames) {
+        this.delegate = new MutablePropertyValues(
+                AnnotationUtils.getAttributes(annotation, propertyResolver, ignoreDefaultValue, ignoreAttributeNames));
+    }
+
+    public AnnotationPropertyValuesAdapter(
+            Annotation annotation, PropertyResolver propertyResolver, String... ignoreAttributeNames) {
         this(annotation, propertyResolver, true, ignoreAttributeNames);
-    }
-
-    private PropertyValues adapt(Annotation annotation, boolean ignoreDefaultValue, String... ignoreAttributeNames) {
-        return new MutablePropertyValues(getAttributes(annotation, propertyResolver, ignoreDefaultValue, ignoreAttributeNames));
-    }
-
-    public Annotation getAnnotation() {
-        return annotation;
-    }
-
-    public boolean isIgnoreDefaultValue() {
-        return ignoreDefaultValue;
     }
 
     @Override

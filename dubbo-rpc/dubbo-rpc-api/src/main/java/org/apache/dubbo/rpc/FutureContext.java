@@ -16,7 +16,10 @@
  */
 package org.apache.dubbo.rpc;
 
+import org.apache.dubbo.common.constants.CommonConstants;
 import org.apache.dubbo.common.threadlocal.InternalThreadLocal;
+import org.apache.dubbo.common.utils.SystemPropertyConfigUtils;
+import org.apache.dubbo.rpc.protocol.dubbo.FutureAdapter;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -29,7 +32,25 @@ import java.util.concurrent.CompletableFuture;
  */
 public class FutureContext {
 
-    public static InternalThreadLocal<CompletableFuture<?>> futureTL = new InternalThreadLocal<>();
+    private static final InternalThreadLocal<FutureContext> futureTL = new InternalThreadLocal<FutureContext>() {
+        @Override
+        protected FutureContext initialValue() {
+            return new FutureContext();
+        }
+    };
+
+    public static FutureContext getContext() {
+        return futureTL.get();
+    }
+
+    private CompletableFuture<?> future;
+    private CompletableFuture<?> compatibleFuture;
+
+    /**
+     * Whether clear future once get
+     */
+    private static final boolean clearFutureAfterGet = Boolean.parseBoolean(SystemPropertyConfigUtils.getSystemProperty(
+            CommonConstants.ThirdPartyProperty.CLEAR_FUTURE_AFTER_GET, "false"));
 
     /**
      * get future.
@@ -38,8 +59,14 @@ public class FutureContext {
      * @return future
      */
     @SuppressWarnings("unchecked")
-    public static <T> CompletableFuture<T> getCompletableFuture() {
-        return (CompletableFuture<T>) futureTL.get();
+    public <T> CompletableFuture<T> getCompletableFuture() {
+        try {
+            return (CompletableFuture<T>) future;
+        } finally {
+            if (clearFutureAfterGet) {
+                this.future = null;
+            }
+        }
     }
 
     /**
@@ -47,8 +74,53 @@ public class FutureContext {
      *
      * @param future
      */
-    public static void setFuture(CompletableFuture<?> future) {
-        futureTL.set(future);
+    public void setFuture(CompletableFuture<?> future) {
+        this.future = future;
     }
 
+    @Deprecated
+    @SuppressWarnings("unchecked")
+    public <T> CompletableFuture<T> getCompatibleCompletableFuture() {
+        try {
+            return (CompletableFuture<T>) compatibleFuture;
+        } finally {
+            if (clearFutureAfterGet) {
+                this.compatibleFuture = null;
+            }
+        }
+    }
+
+    /**
+     * Guarantee 'using org.apache.dubbo.rpc.RpcContext.getFuture() before proxy returns' can work, a typical scenario is:
+     * <pre>{@code
+     *      public final class TracingFilter implements Filter {
+     *          public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
+     *              Result result = invoker.invoke(invocation);
+     *              Future<Object> future = rpcContext.getFuture();
+     *              if (future instanceof FutureAdapter) {
+     *                  ((FutureAdapter) future).getFuture().setCallback(new FinishSpanCallback(span));
+     *               }
+     *              ......
+     *          }
+     *      }
+     * }</pre>
+     * <p>
+     * Start from 2.7.3, you don't have to get Future from RpcContext, we recommend using Result directly:
+     * <pre>{@code
+     *      public final class TracingFilter implements Filter {
+     *          public Result invoke(Invoker<?> invoker, Invocation invocation) throws RpcException {
+     *              Result result = invoker.invoke(invocation);
+     *              result.getResponseFuture().whenComplete(new FinishSpanCallback(span));
+     *              ......
+     *          }
+     *      }
+     * }</pre>
+     */
+    @Deprecated
+    public void setCompatibleFuture(CompletableFuture<?> compatibleFuture) {
+        this.compatibleFuture = compatibleFuture;
+        if (compatibleFuture != null) {
+            this.setFuture(new FutureAdapter(compatibleFuture));
+        }
+    }
 }

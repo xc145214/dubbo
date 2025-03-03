@@ -17,29 +17,36 @@
 package org.apache.dubbo.registry.zookeeper;
 
 import org.apache.dubbo.common.URL;
+import org.apache.dubbo.common.extension.DisableInject;
 import org.apache.dubbo.registry.Registry;
 import org.apache.dubbo.registry.support.AbstractRegistryFactory;
-import org.apache.dubbo.remoting.zookeeper.ZookeeperTransporter;
+import org.apache.dubbo.remoting.zookeeper.curator5.ZookeeperClientManager;
+import org.apache.dubbo.rpc.model.ApplicationModel;
 
 /**
  * ZookeeperRegistryFactory.
- *
  */
 public class ZookeeperRegistryFactory extends AbstractRegistryFactory {
 
-    private ZookeeperTransporter zookeeperTransporter;
+    private ZookeeperClientManager zookeeperClientManager;
 
-    /**
-     * Invisible injection of zookeeper client via IOC/SPI
-     * @param zookeeperTransporter
-     */
-    public void setZookeeperTransporter(ZookeeperTransporter zookeeperTransporter) {
-        this.zookeeperTransporter = zookeeperTransporter;
+    // for compatible usage
+    public ZookeeperRegistryFactory() {
+        this(ApplicationModel.defaultModel());
+    }
+
+    public ZookeeperRegistryFactory(ApplicationModel applicationModel) {
+        this.applicationModel = applicationModel;
+        this.zookeeperClientManager = ZookeeperClientManager.getInstance(applicationModel);
+    }
+
+    @DisableInject
+    public void setZookeeperTransporter(ZookeeperClientManager zookeeperClientManager) {
+        this.zookeeperClientManager = zookeeperClientManager;
     }
 
     @Override
     public Registry createRegistry(URL url) {
-        return new ZookeeperRegistry(url, zookeeperTransporter);
+        return new ZookeeperRegistry(url, zookeeperClientManager);
     }
-
 }

@@ -16,7 +16,7 @@
  */
 package org.apache.dubbo.common.utils;
 
-import org.apache.log4j.Level;
+import org.apache.dubbo.common.logger.Level;
 
 import java.io.Serializable;
 
@@ -112,5 +112,4 @@ public class Log implements Serializable {
         }
         return true;
     }
-
 }

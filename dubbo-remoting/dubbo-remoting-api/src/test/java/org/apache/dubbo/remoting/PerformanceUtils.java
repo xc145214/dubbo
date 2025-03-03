@@ -16,6 +16,9 @@
  */
 package org.apache.dubbo.remoting;
 
+import org.apache.dubbo.common.constants.CommonConstants;
+import org.apache.dubbo.common.utils.SystemPropertyConfigUtils;
+
 import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.text.DecimalFormat;
@@ -56,11 +59,17 @@ public class PerformanceUtils {
 
     public static List<String> getEnvironment() {
         List<String> environment = new ArrayList<String>();
-        environment.add("OS: " + System.getProperty("os.name") + " " + System.getProperty("os.version") + " " + System.getProperty("os.arch", ""));
+        environment.add("OS: "
+                + SystemPropertyConfigUtils.getSystemProperty(CommonConstants.SystemProperty.SYSTEM_OS_NAME) + " "
+                + SystemPropertyConfigUtils.getSystemProperty(CommonConstants.SystemProperty.SYSTEM_OS_VERSION) + " "
+                + SystemPropertyConfigUtils.getSystemProperty(CommonConstants.SystemProperty.OS_ARCH, ""));
         environment.add("CPU: " + Runtime.getRuntime().availableProcessors() + " cores");
-        environment.add("JVM: " + System.getProperty("java.vm.name") + " " + System.getProperty("java.runtime.version"));
-        environment.add("Memory: " + DecimalFormat.getIntegerInstance().format(Runtime.getRuntime().totalMemory())
-                + " bytes (Max: " + DecimalFormat.getIntegerInstance().format(Runtime.getRuntime().maxMemory()) + " bytes)");
+        environment.add("JVM: "
+                + SystemPropertyConfigUtils.getSystemProperty(CommonConstants.SystemProperty.JAVA_VM_NAME) + " "
+                + SystemPropertyConfigUtils.getSystemProperty(CommonConstants.SystemProperty.JAVA_RUNTIME_VERSION));
+        environment.add("Memory: "
+                + DecimalFormat.getIntegerInstance().format(Runtime.getRuntime().totalMemory()) + " bytes (Max: "
+                + DecimalFormat.getIntegerInstance().format(Runtime.getRuntime().maxMemory()) + " bytes)");
         NetworkInterface ni = PerformanceUtils.getNetworkInterface();
         if (ni != null) {
             environment.add("Network: " + ni.getDisplayName());
@@ -71,7 +80,7 @@ public class PerformanceUtils {
     public static void printSeparator() {
         StringBuilder pad = new StringBuilder();
         for (int i = 0; i < WIDTH; i++) {
-            pad.append("-");
+            pad.append('-');
         }
         System.out.println("+" + pad + "+");
     }
@@ -79,7 +88,7 @@ public class PerformanceUtils {
     public static void printBorder() {
         StringBuilder pad = new StringBuilder();
         for (int i = 0; i < WIDTH; i++) {
-            pad.append("=");
+            pad.append('=');
         }
         System.out.println("+" + pad + "+");
     }
@@ -89,7 +98,7 @@ public class PerformanceUtils {
         int len = WIDTH - msg.length() - 1;
         if (len > 0) {
             for (int i = 0; i < len; i++) {
-                pad.append(" ");
+                pad.append(' ');
             }
         }
         System.out.println("| " + msg + pad + "|");
@@ -101,7 +110,7 @@ public class PerformanceUtils {
         if (len > 0) {
             int half = len / 2;
             for (int i = 0; i < half; i++) {
-                pad.append(" ");
+                pad.append(' ');
             }
         }
         System.out.println("|" + pad + msg + pad + ((len % 2 == 0) ? "" : " ") + "|");
@@ -122,5 +131,4 @@ public class PerformanceUtils {
         }
         return null;
     }
-
 }

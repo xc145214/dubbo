@@ -18,6 +18,7 @@ package org.apache.dubbo.common.serialize;
 
 import org.apache.dubbo.common.URL;
 import org.apache.dubbo.common.extension.Adaptive;
+import org.apache.dubbo.common.extension.ExtensionScope;
 import org.apache.dubbo.common.extension.SPI;
 
 import java.io.IOException;
@@ -32,11 +33,13 @@ import java.io.OutputStream;
  *     e.g. &lt;dubbo:protocol serialization="xxx" /&gt;
  * </pre>
  */
-@SPI("hessian2")
+@SPI(scope = ExtensionScope.FRAMEWORK)
 public interface Serialization {
 
     /**
-     * Get content type unique id, recommended that custom implementations use values greater than 20.
+     * Get content type unique id, recommended that custom implementations use values different with
+     * any value of {@link Constants} and don't greater than ExchangeCodec.SERIALIZATION_MASK (31)
+     * because dubbo protocol use 5 bits to record serialization ID in header.
      *
      * @return content type id
      */
@@ -70,5 +73,4 @@ public interface Serialization {
      */
     @Adaptive
     ObjectInput deserialize(URL url, InputStream input) throws IOException;
-
 }

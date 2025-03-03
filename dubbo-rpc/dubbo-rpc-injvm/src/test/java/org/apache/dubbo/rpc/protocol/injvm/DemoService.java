@@ -19,7 +19,6 @@ package org.apache.dubbo.rpc.protocol.injvm;
 /**
  * <code>TestService</code>
  */
-
 public interface DemoService {
     void sayHello(String name);
 
@@ -38,4 +37,10 @@ public interface DemoService {
     int stringLength(String str);
 
     Type enumlength(Type... types);
+
+    String getAsyncResult();
+
+    String getApplication();
+
+    String getRemoteAddress();
 }
